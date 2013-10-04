@@ -480,7 +480,6 @@ mmc_raw_dump_internal (const char* in_file, const char *out_file, unsigned size)
     FILE *out;
     int val = 0;
     char buf[512];
-    unsigned sz = 0;
     unsigned i;
     int ret = -1;
 

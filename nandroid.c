@@ -153,13 +153,6 @@ static int tar_compress_wrapper(const char* backup_path, const char* backup_file
     return do_tar_compress(tmp, callback);
 }
 
-static int tar_gzip_compress_wrapper(const char* backup_path, const char* backup_file_image, int callback) {
-    char tmp[PATH_MAX];
-    sprintf(tmp, "cd $(dirname %s) ; touch %s.tar.gz ; (tar cv --exclude=data/data/com.google.android.music/files/* %s $(basename %s) | pigz -c | split -a 1 -b 1000000000 /proc/self/fd/0 %s.tar.gz.) 2> /proc/self/fd/1 ; exit $?", backup_path, backup_file_image, strcmp(backup_path, "/data") == 0 && is_data_media() ? "--exclude 'media'" : "", backup_path, backup_file_image);
-
-    return do_tar_compress(tmp, callback);
-}
-
 static int tar_dump_wrapper(const char* backup_path, const char* backup_file_image, int callback) {
     char tmp[PATH_MAX];
     sprintf(tmp, "cd $(dirname %s); tar cv --exclude=data/data/com.google.android.music/files/* %s $(basename %s) 2> /dev/null | cat", backup_path, strcmp(backup_path, "/data") == 0 && is_data_media() ? "--exclude 'media'" : "", backup_path);
@@ -238,8 +231,6 @@ static void refresh_default_backup_handler() {
     fmt[3] = '\0';
     if (0 == strcmp(fmt, "dup"))
         default_backup_handler = dedupe_compress_wrapper;
-    else if (0 == strcmp(fmt, "tgz"))
-        default_backup_handler = tar_gzip_compress_wrapper;
     else if (0 == strcmp(fmt, "tar"))
         default_backup_handler = tar_compress_wrapper;
     else
@@ -250,8 +241,6 @@ unsigned nandroid_get_default_backup_format() {
     refresh_default_backup_handler();
     if (default_backup_handler == dedupe_compress_wrapper) {
         return NANDROID_BACKUP_FORMAT_DUP;
-    } else if (default_backup_handler == tar_gzip_compress_wrapper) {
-        return NANDROID_BACKUP_FORMAT_TGZ;
     } else {
         return NANDROID_BACKUP_FORMAT_TAR;
     }
@@ -536,13 +525,6 @@ static int do_tar_extract(char* command, int callback) {
     return __pclose(fp);
 }
 
-static int tar_gzip_extract_wrapper(const char* backup_file_image, const char* backup_path, int callback) {
-    char tmp[PATH_MAX];
-    sprintf(tmp, "cd $(dirname %s) ; cat %s* | pigz -d -c | tar xv ; exit $?", backup_path, backup_file_image);
-
-    return do_tar_extract(tmp, callback);
-}
-
 static int tar_extract_wrapper(const char* backup_file_image, const char* backup_path, int callback) {
     char tmp[PATH_MAX];
     sprintf(tmp, "cd $(dirname %s) ; cat %s* | tar xv ; exit $?", backup_path, backup_file_image);
@@ -653,12 +635,6 @@ int nandroid_restore_partition_extended(const char* backup_path, const char* mou
             if (0 == (ret = stat(tmp, &file_info))) {
                 backup_filesystem = filesystem;
                 restore_handler = tar_extract_wrapper;
-                break;
-            }
-            sprintf(tmp, "%s/%s.%s.tar.gz", backup_path, name, filesystem);
-            if (0 == (ret = stat(tmp, &file_info))) {
-                backup_filesystem = filesystem;
-                restore_handler = tar_gzip_extract_wrapper;
                 break;
             }
             sprintf(tmp, "%s/%s.%s.dup", backup_path, name, filesystem);
