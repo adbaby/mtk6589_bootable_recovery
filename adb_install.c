@@ -99,7 +99,6 @@ void *adb_sideload_thread(void* v) {
 
 int
 apply_from_adb() {
-
     stop_adbd();
     set_usb_driver(1);
 
@@ -115,7 +114,7 @@ apply_from_adb() {
     pthread_t sideload_thread;
     pthread_create(&sideload_thread, NULL, &adb_sideload_thread, &data);
     
-    static char* headers[] = {  "ADB Sideload",
+    static const char* headers[] = {  "ADB Sideload",
                                 "",
                                 NULL
     };
@@ -153,6 +152,5 @@ apply_from_adb() {
     }
 
     remove(ADB_SIDELOAD_FILENAME);
-
     return install_status;
 }

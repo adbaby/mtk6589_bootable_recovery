@@ -44,6 +44,7 @@
 #include "adb_install.h"
 #include "minadbd/adb.h"
 
+#include "firmware.h"
 #include "extendedcommands.h"
 #include "flashutils/flashutils.h"
 #include "dedupe/dedupe.h"
@@ -273,7 +274,6 @@ copy_log_file(const char* destination, int append) {
     }
 }
 
-
 // clear the recovery command and prepare to boot a (hopefully working) system,
 // copy our log file to cache as well (for the system to read), and
 // record any intent we were asked to communicate back to the system.
@@ -416,22 +416,22 @@ copy_sideloaded_package(const char* original_path) {
   return strdup(copy_path);
 }
 
-static char**
-prepend_title(char** headers) {
-    char* title[] = { EXPAND(RECOVERY_VERSION),
-                      EXPAND(RECOVERY_VERSION_INFO),
-                      "",
-                      NULL };
+static const char**
+prepend_title(const char** headers) {
+    const char* title[] = { EXPAND(RECOVERY_VERSION),
+		                    EXPAND(RECOVERY_VERSION_INFO),
+		                    "",
+		                    NULL };
 
     // count the number of lines in our title, plus the
     // caller-provided headers.
     int count = 0;
-    char** p;
+    const char** p;
     for (p = title; *p; ++p, ++count);
     for (p = headers; *p; ++p, ++count);
 
-    char** new_headers = malloc((count+1) * sizeof(char*));
-    char** h = new_headers;
+    const char** new_headers = malloc((count+1) * sizeof(const char*));
+    const char** h = new_headers;
     for (p = title; *p; ++p, ++h) *h = *p;
     for (p = headers; *p; ++p, ++h) *h = *p;
     *h = NULL;
@@ -448,7 +448,8 @@ get_menu_selection(char** headers, char** items, int menu_only,
     
     int item_count = ui_start_menu(headers, items, initial_selection);
     int selected = initial_selection;
-    int chosen_item = -1;
+    int chosen_item = -1; // NO_ACTION
+    int wrap_count = 0;
 
     while (chosen_item < 0 && chosen_item != GO_BACK) {
         int key = ui_wait_key();
@@ -463,7 +464,7 @@ get_menu_selection(char** headers, char** items, int menu_only,
                 return ITEM_REBOOT;
             }
         }
-        else if (key == -2) {
+        else if (key == -2) {   // we are returning from ui_cancel_wait_key(): trigger a GO_BACK
             return GO_BACK;
         }
 
@@ -499,6 +500,21 @@ get_menu_selection(char** headers, char** items, int menu_only,
         } else if (!menu_only) {
             chosen_item = action;
         }
+
+        if (abs(selected - old_selected) > 1) {
+            wrap_count++;
+            if (wrap_count == 5) {
+                wrap_count = 0;
+                if (ui_get_rainbow_mode()) {
+                    ui_set_rainbow_mode(0);
+                    ui_print("Rainbow mode disabled\n");
+                }
+                else {
+                    ui_set_rainbow_mode(1);
+                    ui_print("Rainbow mode enabled!\n");
+                }
+            }
+        }
     }
 
     ui_end_menu();
@@ -529,7 +545,7 @@ update_directory(const char* path, const char* unmount_when_done) {
         return 0;
     }
 
-    char** headers = prepend_title(MENU_HEADERS);
+    const char** headers = prepend_title(MENU_HEADERS);
 
     int d_size = 0;
     int d_alloc = 10;
@@ -655,19 +671,19 @@ wipe_data(int confirm) {
 }
 
 static void headless_wait() {
-  ui_show_text(0);
-  char** headers = prepend_title((const char**)MENU_HEADERS);
-  for (;;) {
-    finish_recovery(NULL);
-    get_menu_selection(headers, MENU_ITEMS, 0, 0);
-  }
+    ui_show_text(0);
+    const char** headers = prepend_title((const char**)MENU_HEADERS);
+    for(;;) {
+        finish_recovery(NULL);
+        get_menu_selection(headers, MENU_ITEMS, 0, 0);
+    }
 }
 
 int ui_menu_level = 1;
 int ui_root_menu = 0;
 static void
 prompt_and_wait() {
-    char** headers = prepend_title((const char**)MENU_HEADERS);
+    const char** headers = prepend_title((const char**)MENU_HEADERS);
 
     for (;;) {
         finish_recovery(NULL);
@@ -693,36 +709,36 @@ prompt_and_wait() {
                 poweroff = 0;
                 return;
 
-            case ITEM_WIPE_DATA:
-                wipe_data(ui_text_visible());
-                if (!ui_text_visible()) return;
-                break;
+                case ITEM_WIPE_DATA:
+	                wipe_data(ui_text_visible());
+	                if (!ui_text_visible()) return;
+	                break;
 
-            case ITEM_WIPE_CACHE:
-                if (confirm_selection("Confirm wipe?", "Yes - Wipe Cache"))
-                {
-                    ui_print("\n-- Wiping cache...\n");
-                    erase_volume("/cache");
-                    ui_print("Cache wipe complete.\n");
-                    if (!ui_text_visible()) return;
-                }
-                break;
+	            case ITEM_WIPE_CACHE:
+	                if (confirm_selection("Confirm wipe?", "Yes - Wipe Cache"))
+	                {
+	                    ui_print("\n-- Wiping cache...\n");
+	                    erase_volume("/cache");
+	                    ui_print("Cache wipe complete.\n");
+	                    if (!ui_text_visible()) return;
+	                }
+	                break;
 
-            case ITEM_APPLY_ZIP:
-                show_install_update_menu();
-                break;
-
-            case ITEM_NANDROID:
-                show_nandroid_menu();
-                break;
-
-            case ITEM_PARTITION:
-                show_partition_menu();
-                break;
-
-            case ITEM_ADVANCED:
-                show_advanced_menu();
-                break;
+                case ITEM_APPLY_ZIP:
+	                show_install_update_menu();
+	                break;
+	
+	            case ITEM_NANDROID:
+	                show_nandroid_menu();
+	                break;
+	
+	            case ITEM_PARTITION:
+	                show_partition_menu();
+	                break;
+	
+	            case ITEM_ADVANCED:
+	                show_advanced_menu();
+	                break;
         }
     }
 }
@@ -890,7 +906,7 @@ main(int argc, char **argv) {
 
     if (!sehandle) {
         fprintf(stderr, "Warning: No file_contexts\n");
-        // ui_print("Warning:  No file_contexts\n");
+        // ("Warning:  No file_contexts\n");
     }
 
     LOGI("device_recovery_start()\n");

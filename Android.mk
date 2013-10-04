@@ -20,7 +20,7 @@ LOCAL_SRC_FILES := \
     prop.c \
     default_recovery_ui.c \
     adb_install.c \
-    verifier.c
+    verifier.c 
 
 ADDITIONAL_RECOVERY_FILES := $(shell echo $$ADDITIONAL_RECOVERY_FILES)
 LOCAL_SRC_FILES += $(ADDITIONAL_RECOVERY_FILES)
@@ -34,11 +34,11 @@ RECOVERY_NAME := ClockworkMod Recovery
 LOCAL_CFLAGS += -DI_AM_KOUSH
 else
 ifndef RECOVERY_NAME
-RECOVERY_NAME := CWM-based Recovery
+RECOVERY_NAME := CWM-MTK Recovery
 endif
 endif
 
-RECOVERY_VERSION := $(RECOVERY_NAME) v6.0.3.7
+RECOVERY_VERSION := $(RECOVERY_NAME) v6.0.4.0
 RECOVERY_VERSION_INFO := Modd by carliv@xda
 
 LOCAL_CFLAGS += -DRECOVERY_VERSION="$(RECOVERY_VERSION)"
